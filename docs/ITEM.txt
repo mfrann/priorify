@@ -1,0 +1,135 @@
+// Archived reference snippet.
+import { BUBBLE_SIZE, PRIORITY_COLORS } from "@/shared/constants/theme";
+import { Task } from "@/features/tasks/types/task";
+import { useEffect } from "react";
+import { Text, TouchableOpacity } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
+
+interface BubbleItemProps {
+  task: Task;
+  onPress: () => void;
+  scale?: number;
+  index?: number;
+  offsetX?: number;
+  offsetY?: number;
+  bubbleId?: string;
+}
+
+export function BubbleItem({
+  task,
+  onPress,
+  scale = 1,
+  index = 0,
+  offsetX = 0,
+  offsetY = 0,
+  bubbleId,
+}: BubbleItemProps) {
+  const baseSize = BUBBLE_SIZE[task.priority];
+  const size = baseSize * scale;
+  const color = PRIORITY_COLORS[task.priority];
+  const fontSize = task.priority >= 4 ? 14 : 12;
+
+  // Animaciones
+  const scaleAnim = useSharedValue(0);
+  const opacityAnim = useSharedValue(0);
+  const floatAnim = useSharedValue(0);
+  const pressAnim = useSharedValue(1);
+
+  // Animación de entrada (fade + scale)
+  useEffect(() => {
+    scaleAnim.value = withDelay(
+      index * 50,
+      withSpring(1, { damping: 12, stiffness: 100 }),
+    );
+    opacityAnim.value = withDelay(index * 50, withTiming(1, { duration: 300 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
+
+  // Animación de floating (movimiento sutil continuo)
+  useEffect(() => {
+    floatAnim.value = withRepeat(
+      withTiming(1, { duration: 2000 + index * 200 }),
+      -1,
+      true,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
+
+  // Manejar press
+  const handlePressIn = () => {
+    pressAnim.value = withSpring(0.9, { damping: 15, stiffness: 200 });
+  };
+
+  const handlePressOut = () => {
+    pressAnim.value = withSpring(1, { damping: 15, stiffness: 200 });
+  };
+
+  // Estilo animado combinado
+  const animatedStyle = useAnimatedStyle(() => {
+    const floatOffset = Math.sin(floatAnim.value * Math.PI) * 5;
+
+    return {
+      transform: [
+        { scale: scaleAnim.value * pressAnim.value },
+        { translateY: floatOffset },
+      ],
+      opacity: opacityAnim.value * (task.completed ? 0.5 : 1),
+    };
+  });
+
+  return (
+    <Animated.View
+      key={bubbleId}
+      style={[
+        {
+          position: "absolute",
+          left: offsetX,
+          top: offsetY,
+        },
+        animatedStyle,
+      ]}
+    >
+      <TouchableOpacity
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: color,
+          borderWidth: 2,
+          borderColor: "rgba(255, 255, 255, 0.4)",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: 8 * scale,
+          shadowColor: color,
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.4,
+          shadowRadius: 12,
+          elevation: 6,
+        }}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
+      >
+        <Text
+          numberOfLines={2}
+          style={{
+            textAlign: "center",
+            fontWeight: "600",
+            fontSize: fontSize * scale,
+            color: "#333",
+          }}
+        >
+          {task.title}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}

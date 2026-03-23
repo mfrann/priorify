@@ -1,50 +1,45 @@
-# Welcome to your Expo app 👋
+# Priorify
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Priorify is a visual task-prioritization app built with Expo and React Native. Tasks are represented as animated bubbles, where larger bubbles indicate higher priority.
 
-## Get started
+## Stack
 
-1. Install dependencies
+- Expo SDK 54
+- React Native 0.81.5
+- React 19.1.0
+- TypeScript 5.9.2
+- Zustand
+- AsyncStorage
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Commands
 
 ```bash
-npm run reset-project
+npm start
+npm run android
+npm run ios
+npm run web
+npm run lint
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Architecture
 
-## Learn more
+```txt
+app/                       Expo Router routes and screen composition
+features/tasks/            Task domain code
+  components/              Task-specific UI
+  hooks/                   Task hooks
+  services/                Task persistence
+  store/                   Zustand state
+  types/                   Task domain types
+shared/                    Reusable cross-feature modules
+  components/              Shared UI primitives
+  constants/               Shared visual tokens
+docs/                      Notes and design references
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+## Notes
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `app/` should stay thin and focus on route composition.
+- Task-specific code should stay under `features/tasks/`.
+- Reusable, domain-agnostic code should go in `shared/`.
+- Archived experiments and design references belong in `docs/`.

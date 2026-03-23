@@ -1,0 +1,209 @@
+// Archived reference snippet.
+import { Task } from "@/features/tasks/types/task";
+import { StyleSheet, ScrollView, Dimensions } from "react-native";
+import { BubbleItem } from "./BubbleItem";
+import { useTheme } from "@/contexts/ThemeContext";
+import { BUBBLE_SIZE } from "@/shared/constants/theme";
+
+interface BubbleCanvasProps {
+  tasks: Task[];
+  onTaskPress: (task: Task) => void;
+}
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const CANVAS_WIDTH = SCREEN_WIDTH - 40; // padding 20 cada lado
+const CANVAS_HEIGHT = SCREEN_HEIGHT - 200; // header + bottom padding
+const CENTER_X = CANVAS_WIDTH / 2;
+const CENTER_Y = CANVAS_HEIGHT / 2;
+
+// Calcular escala base dinámica según cantidad y tamaño de tareas
+const calculateBaseScale = (tasks: Task[]): number => {
+  if (tasks.length === 0) return 1;
+
+  // Calcular el área total que necesitarían las tareas sin escala
+  const totalArea = tasks.reduce((sum, task) => {
+    const size = BUBBLE_SIZE[task.priority];
+    return sum + Math.PI * Math.pow(size / 2, 2);
+  }, 0);
+
+  // Área disponible (80% del canvas para dejar margen)
+  const availableArea = CANVAS_WIDTH * CANVAS_HEIGHT * 0.8;
+
+  // Escala necesaria para que quepan
+  const scale = Math.sqrt(availableArea / totalArea);
+
+  // Límites: nunca más de 100%, nunca menos de 40%
+  return Math.min(1, Math.max(0.4, scale));
+};
+
+// Factor de escala por prioridad (las altas se reducen menos)
+const getPriorityScale = (priority: number): number => {
+  const scaleMap: Record<number, number> = {
+    5: 1.0,    // Prioridad máxima: siempre 100%
+    4: 0.95,   // Prioridad alta: 95%
+    3: 0.9,    // Prioridad media: 90%
+    2: 0.85,   // Prioridad baja: 85%
+    1: 0.8,    // Prioridad mínima: 80%
+  };
+  return scaleMap[priority] || 0.9;
+};
+
+export function BubbleCanvas({ tasks, onTaskPress }: BubbleCanvasProps) {
+  const { colors } = useTheme();
+  // 1. Ordenar tareas por prioridad (mayor primero)
+  const sortedTasks = [...tasks].sort((a, b) => b.priority - a.priority);
+
+  // 2. Calcular escala base dinámica
+  const baseScale = calculateBaseScale(sortedTasks);
+
+  // 3. Calcular posiciones con anti-colisión y límites de pantalla
+  const positionedTasks: { task: Task; x: number; y: number; scale: number }[] = [];
+
+  sortedTasks.forEach((task, index) => {
+    // Escala combinada: base (dinámica) + prioridad
+    const priorityScale = getPriorityScale(task.priority);
+    const scale = baseScale * priorityScale;
+
+    const bubbleSize = BUBBLE_SIZE[task.priority] * scale;
+    const bubbleRadius = bubbleSize / 2;
+    const minGap = 5 * scale; // Espacio mínimo entre burbujas
+
+    // Posición inicial en espiral mejorada
+    // Ángulo áureo (~137.5°) para distribución más uniforme
+    const goldenAngle = 2.39996; // radians
+    const angle = index * goldenAngle;
+    
+    // Radio aumenta gradualmente, pero más lento para más densidad
+    const radiusStep = (bubbleRadius + minGap) * 1.8;
+    let radius = index === 0 ? 0 : radiusStep * Math.sqrt(index);
+    
+    let x = CENTER_X + Math.cos(angle) * radius;
+    let y = CENTER_Y + Math.sin(angle) * radius;
+
+    // Límites de pantalla: mantener burbuja dentro del canvas
+    const minX = bubbleRadius;
+    const maxX = CANVAS_WIDTH - bubbleRadius;
+    const minY = bubbleRadius;
+    const maxY = CANVAS_HEIGHT - bubbleRadius;
+
+    // ALGORITMO DE ANTI-COLISIÓN ITERATIVO
+    // Repetir hasta que no haya colisiones o se alcance el máximo
+    let iterations = 0;
+    const maxIterations = 200;
+
+    while (iterations < maxIterations) {
+      let hasCollision = false;
+      let moveX = 0;
+      let moveY = 0;
+
+      // Verificar colisiones con TODAS las burbujas posicionadas
+      for (const positioned of positionedTasks) {
+        const otherSize = BUBBLE_SIZE[positioned.task.priority] * positioned.scale;
+        const otherRadius = otherSize / 2;
+        const minDistance = bubbleRadius + otherRadius + minGap;
+
+        const dx = x - positioned.x;
+        const dy = y - positioned.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < minDistance && distance > 0) {
+          // Hay colisión: calcular vector de empuje
+          const overlap = minDistance - distance;
+          const pushX = (dx / distance) * overlap;
+          const pushY = (dy / distance) * overlap;
+          
+          moveX += pushX;
+          moveY += pushY;
+          hasCollision = true;
+        } else if (distance === 0) {
+          // Centros exactamente iguales: empujar en dirección aleatoria
+          const randomAngle = Math.random() * Math.PI * 2;
+          moveX += Math.cos(randomAngle) * minDistance;
+          moveY += Math.sin(randomAngle) * minDistance;
+          hasCollision = true;
+        }
+      }
+
+      // Aplicar movimiento acumulado
+      if (hasCollision) {
+        x += moveX * 0.5; // Factor de amortiguación para estabilidad
+        y += moveY * 0.5;
+      }
+
+      // Verificar y corregir límites de pantalla
+      let outOfBounds = false;
+      if (x < minX) {
+        x = minX + (minX - x) * 0.5;
+        outOfBounds = true;
+      }
+      if (x > maxX) {
+        x = maxX - (x - maxX) * 0.5;
+        outOfBounds = true;
+      }
+      if (y < minY) {
+        y = minY + (minY - y) * 0.5;
+        outOfBounds = true;
+      }
+      if (y > maxY) {
+        y = maxY - (y - maxY) * 0.5;
+        outOfBounds = true;
+      }
+
+      // Si no hay colisiones ni límites violados, terminamos
+      if (!hasCollision && !outOfBounds) break;
+      
+      iterations++;
+    }
+
+    // Ajustar para que (x, y) sea la esquina superior izquierda
+    const finalX = x - bubbleRadius;
+    const finalY = y - bubbleRadius;
+
+    positionedTasks.push({ task, x: finalX, y: finalY, scale });
+  });
+
+  // 4. Calcular el tamaño necesario del canvas según las posiciones
+  const maxRight = Math.max(
+    ...positionedTasks.map((p) => p.x + BUBBLE_SIZE[p.task.priority] * p.scale),
+    CANVAS_WIDTH
+  );
+  const maxBottom = Math.max(
+    ...positionedTasks.map((p) => p.y + BUBBLE_SIZE[p.task.priority] * p.scale),
+    CANVAS_HEIGHT
+  );
+
+  return (
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={[
+        styles.content,
+        { width: maxRight + 40, height: maxBottom + 40 },
+      ]}
+      showsVerticalScrollIndicator={false}
+      showsHorizontalScrollIndicator={false}
+      bounces={false}
+    >
+      {positionedTasks.map(({ task, x, y, scale }, index) => (
+        <BubbleItem
+          key={task.id}
+          bubbleId={task.id}
+          task={task}
+          onPress={() => onTaskPress(task)}
+          scale={scale}
+          index={index}
+          offsetX={x + 20}
+          offsetY={y + 20}
+        />
+      ))}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  content: {
+    position: "relative",
+  },
+});

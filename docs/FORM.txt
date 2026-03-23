@@ -1,0 +1,418 @@
+// Archived reference snippet.
+import { PRIORITY_COLORS } from "@/shared/constants/theme";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Priority, Task } from "@/features/tasks/types/task";
+import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { useEffect, useState } from "react";
+import {
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
+interface TaskFormProps {
+  visible: boolean;
+  onClose: () => void;
+  onSubmit: (task: Omit<Task, "id" | "completed" | "createdAT">) => void;
+  initialTask?: Task;
+}
+
+export function TaskForm({
+  visible,
+  onClose,
+  onSubmit,
+  initialTask,
+}: TaskFormProps) {
+  const { colors } = useTheme();
+  const { t } = useLanguage();
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [priority, setPriority] = useState<Priority>(3);
+  const [deadline, setDeadline] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [deadlineDate, setDeadlineDate] = useState<Date | null>(null);
+
+  // Resetear form cuando cambia initialTask o cuando se abre el modal
+  useEffect(() => {
+    if (visible) {
+      setTitle(initialTask?.title ?? "");
+      setDescription(initialTask?.description ?? "");
+      setPriority(initialTask?.priority ?? 3);
+      setDeadline(initialTask?.deadline ?? "");
+      setDeadlineDate(
+        initialTask?.deadline ? new Date(initialTask.deadline) : null,
+      );
+    }
+  }, [initialTask, visible]);
+
+  const handleSubmit = () => {
+    if (!title.trim()) return;
+
+    onSubmit({
+      title,
+      description: description || undefined,
+      priority,
+      deadline: deadline || undefined,
+    });
+
+    // Reset form
+    setTitle("");
+    setDescription("");
+    setPriority(3);
+    setDeadline("");
+    setDeadlineDate(null);
+    setShowDatePicker(false);
+    onClose();
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    // En Android, onChange se dispara dos veces: al seleccionar y al cerrar
+    // Solo procesamos cuando el usuario confirmó (type === "set")
+    if (Platform.OS === "android") {
+      setShowDatePicker(false);
+      if (event.type !== "set" || !selectedDate) {
+        return;
+      }
+    }
+
+    if (selectedDate) {
+      setDeadlineDate(selectedDate);
+      const formatted = selectedDate.toISOString().split("T")[0];
+      setDeadline(formatted);
+    }
+  };
+
+  const handleClearDate = () => {
+    setDeadlineDate(null);
+    setDeadline("");
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <View style={[styles.overlay, { backgroundColor: colors.modalOverlay }]}>
+        <View
+          style={[styles.container, { backgroundColor: colors.background }]}
+        >
+          <Text style={[styles.title, { color: colors.text }]}>
+            {initialTask ? t.form.editTask : t.form.newTask}
+          </Text>
+
+          <ScrollView
+            style={styles.content}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Title Input */}
+            <View style={styles.field}>
+              <Text style={[styles.label, { color: colors.text }]}>
+                {t.form.titleLabel}
+              </Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.inputBackground,
+                    borderColor: colors.inputBorder,
+                    color: colors.text,
+                  },
+                ]}
+                placeholder={t.form.titlePlaceholder}
+                value={title}
+                onChangeText={setTitle}
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+
+            {/* Description Input */}
+            <View style={styles.field}>
+              <Text style={[styles.label, { color: colors.text }]}>
+                {t.form.descriptionLabel}
+              </Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  styles.textArea,
+                  {
+                    backgroundColor: colors.inputBackground,
+                    borderColor: colors.inputBorder,
+                    color: colors.text,
+                  },
+                ]}
+                placeholder={t.form.descriptionPlaceholder}
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                numberOfLines={3}
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+
+            {/* Priority Selector */}
+            <View style={styles.field}>
+              <Text style={[styles.label, { color: colors.text }]}>
+                {t.form.priorityLabel}
+              </Text>
+              <View style={styles.priorityContainer}>
+                {[1, 2, 3, 4, 5].map((p) => (
+                  <TouchableOpacity
+                    key={p}
+                    style={[
+                      styles.priorityBubble,
+                      {
+                        backgroundColor: PRIORITY_COLORS[p as Priority],
+                        borderColor: colors.border,
+                      },
+                      priority === p && {
+                        ...styles.prioritySelected,
+                        borderColor: colors.text,
+                      },
+                    ]}
+                    onPress={() => setPriority(p as Priority)}
+                  >
+                    <Text style={[styles.priorityText, { color: colors.text }]}>
+                      {p}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={styles.priorityLabels}>
+                <Text
+                  style={[
+                    styles.priorityLabel,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  {t.form.low}
+                </Text>
+                <Text
+                  style={[
+                    styles.priorityLabel,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  {t.form.high}
+                </Text>
+              </View>
+            </View>
+
+            {/* Deadline Input */}
+            <View style={styles.field}>
+              <Text style={[styles.label, { color: colors.text }]}>
+                {t.form.deadlineLabel}
+              </Text>
+
+              <TouchableOpacity
+                style={[
+                  styles.dateInput,
+                  {
+                    backgroundColor: colors.inputBackground,
+                    borderColor: colors.inputBorder,
+                  },
+                ]}
+                onPress={() => setShowDatePicker(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="calendar-outline"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+                <Text
+                  style={[
+                    deadline
+                      ? styles.dateInputText
+                      : styles.dateInputPlaceholder,
+                    { color: deadline ? colors.text : colors.textSecondary },
+                  ]}
+                >
+                  {deadline || t.form.pickDate}
+                </Text>
+                {deadline && (
+                  <TouchableOpacity
+                    onPress={handleClearDate}
+                    style={[
+                      styles.clearDateButton,
+                      { backgroundColor: colors.border },
+                    ]}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons
+                      name="close-circle"
+                      size={18}
+                      color={colors.text}
+                    />
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+
+              {showDatePicker && (
+                <DateTimePicker
+                  value={deadlineDate || new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={handleDateChange}
+                  minimumDate={new Date()}
+                />
+              )}
+            </View>
+          </ScrollView>
+
+          {/* Actions */}
+          <View style={[styles.actions, { borderTopColor: colors.border }]}>
+            <TouchableOpacity
+              style={[styles.cancelButton, { backgroundColor: colors.surface }]}
+              onPress={onClose}
+            >
+              <Text style={[styles.cancelButtonText, { color: colors.text }]}>
+                {t.form.cancel}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.submitButton,
+                { backgroundColor: colors.text },
+                !title.trim() && { backgroundColor: colors.border },
+              ]}
+              onPress={handleSubmit}
+              disabled={!title.trim()}
+            >
+              <Text
+                style={[styles.submitButtonText, { color: colors.background }]}
+              >
+                {initialTask ? t.form.update : t.form.create}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  container: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "90%",
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "700",
+    padding: 20,
+    paddingBottom: 10,
+  },
+  content: {
+    paddingHorizontal: 20,
+    maxHeight: 400,
+  },
+  field: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 0,
+    borderRadius: 30,
+    padding: 15,
+    fontSize: 16,
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: "top",
+  },
+  priorityContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  priorityBubble: {
+    flex: 1,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+  },
+  prioritySelected: {
+    borderWidth: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  priorityText: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  priorityLabels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 6,
+  },
+  priorityLabel: {
+    fontSize: 12,
+  },
+  dateInput: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 0,
+    borderRadius: 30,
+    padding: 15,
+    gap: 10,
+  },
+  dateInputText: {
+    flex: 1,
+    fontSize: 16,
+  },
+  dateInputPlaceholder: {
+    flex: 1,
+    fontSize: 16,
+  },
+  clearDateButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  actions: {
+    flexDirection: "row",
+    padding: 20,
+    gap: 12,
+    borderTopWidth: 1,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 30,
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  submitButton: {
+    flex: 1.5,
+    paddingVertical: 14,
+    borderRadius: 30,
+    alignItems: "center",
+  },
+  submitButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+});
