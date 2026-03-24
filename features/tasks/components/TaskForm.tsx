@@ -5,7 +5,7 @@ import type {
   TaskInput,
 } from "@/features/tasks/types/task";
 import { X } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -38,6 +38,14 @@ export function TaskForm({
   const [category, setCategory] = useState<Category | undefined>(undefined);
   const [deadline, setDeadline] = useState<Date | undefined>(undefined);
 
+  const resetForm = useCallback(() => {
+    setTitle("");
+    setDescription("");
+    setPriority(2);
+    setCategory(undefined);
+    setDeadline(undefined);
+  }, []);
+
   useEffect(() => {
     if (initialTask) {
       setTitle(initialTask.title);
@@ -50,15 +58,7 @@ export function TaskForm({
     } else {
       resetForm();
     }
-  }, [initialTask, visible]);
-
-  const resetForm = () => {
-    setTitle("");
-    setDescription("");
-    setPriority(2);
-    setCategory(undefined);
-    setDeadline(undefined);
-  };
+  }, [initialTask, visible, resetForm]);
 
   const handleSave = () => {
     if (!title.trim()) return;
@@ -119,7 +119,7 @@ export function TaskForm({
         </View>
 
         <ScrollView
-          style={styles.scrollView}
+          style={[styles.scrollView, { flex: 1 }]}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={true}
           indicatorStyle="white"

@@ -12,7 +12,7 @@ interface TaskStore {
   updateTask: (id: string, updates: Partial<Task>) => Promise<void>;
   removeTask: (id: string) => Promise<void>;
   toggleComplete: (id: string) => Promise<void>;
-  loadTasks: () => Promise<void>;
+  initialize: () => Promise<void>;
 }
 
 export const useTaskStore = create<TaskStore>((set, get) => ({
@@ -24,7 +24,8 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     return get().tasks.find((task) => task.id === id);
   },
 
-  loadTasks: async () => {
+  initialize: async () => {
+    if (get().isInitialized) return;
     set({ isLoading: true });
     try {
       const tasks = await StorageService.getAllTasks();
@@ -75,11 +76,22 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   toggleComplete: async (id: string) => {
-    const task = get().getTaskById(id);
+    const currentTasks = get().tasks;
+    const task = currentTasks.find((t) => t.id === id);
     if (!task) return;
-    await get().updateTask(id, { completed: !task.completed });
+
+    // Optimistic update
+    const newCompleted = !task.completed;
+    const newTasks = currentTasks.map((t) =>
+      t.id === id ? { ...t, completed: newCompleted } : t
+    );
+    set({ tasks: newTasks });
+
+    // Persist and rollback on failure
+    const success = await StorageService.saveTask({ ...task, completed: newCompleted });
+    if (!success) {
+      set({ tasks: currentTasks });
+      console.error('Failed to persist toggleComplete');
+    }
   },
 }));
-
-// Auto-initialization trigger
-useTaskStore.getState().loadTasks();

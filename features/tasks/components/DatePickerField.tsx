@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, View, Text, Pressable, Platform } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Calendar, X } from 'lucide-react-native';
 
 interface DatePickerFieldProps {
@@ -24,7 +24,7 @@ export function DatePickerField({ value, onChange }: DatePickerFieldProps) {
     setShowPicker(false);
   };
 
-  const handleChange = (event: any, selectedDate?: Date) => {
+  const handleChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
       setShowPicker(false);
     }

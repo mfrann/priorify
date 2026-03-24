@@ -1,6 +1,6 @@
 import { useTaskStore } from '@/features/tasks/store/taskStore';
 import type { Task } from '@/features/tasks/types/task';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 
 interface UseTasksReturn {
   tasks: Task[];
@@ -17,6 +17,11 @@ interface UseTasksReturn {
 
 export function useTasks(): UseTasksReturn {
   const store = useTaskStore();
+
+  // Lazy initialization on first mount
+  useEffect(() => {
+    store.initialize();
+  }, []);
 
   const activeTasks = useMemo(
     () => store.tasks.filter((t) => !t.completed),

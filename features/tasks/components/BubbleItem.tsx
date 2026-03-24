@@ -1,17 +1,17 @@
 import type { Task } from "@/features/tasks/types/task";
-import {
-  BUBBLE_SIZE,
-  CATEGORY_COLORS,
-  NO_CATEGORY_COLOR,
-} from "@/shared/constants/theme";
+import { BUBBLE_SIZE } from "@/shared/constants/theme";
+import { Check } from "lucide-react-native";
 import { useEffect } from "react";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Easing,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
   withRepeat,
+  withSequence,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
@@ -19,53 +19,62 @@ import Animated, {
 interface BubbleItemProps {
   task: Task;
   onPress: () => void;
+  onDoubleTap?: () => void;
+  color: string;
   scale?: number;
   index?: number;
   offsetX?: number;
   offsetY?: number;
   bubbleId?: string;
+  zIndex?: number;
+  colliding?: boolean;
 }
 
 export function BubbleItem({
   task,
   index = 0,
   onPress,
+  onDoubleTap,
+  color,
   scale: scaleProp = 1,
   offsetX = 0,
   offsetY = 0,
   bubbleId,
+  zIndex = 1,
+  colliding,
 }: BubbleItemProps) {
   const size = BUBBLE_SIZE[task.priority] * scaleProp;
-  const backgroundColor = task.category
-    ? CATEGORY_COLORS[task.category]
-    : NO_CATEGORY_COLOR;
-  const fontSize = task.priority >= 3 ? 14 : 12;
+  const backgroundColor = color;
 
-  // Helper para hacer el color más oscuro para el borde
-  const adjustColor = (hex: string, amount: number): string => {
-    const num = parseInt(hex.replace("#", ""), 16);
-    const r = Math.max(0, Math.min(255, (num >> 16) + amount));
-    const g = Math.max(0, Math.min(255, ((num >> 8) & 0x00ff) + amount));
-    const b = Math.max(0, Math.min(255, (num & 0x0000ff) + amount));
-    return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
-  };
-  const borderColor = adjustColor(backgroundColor, -15);
+  // Texto adaptativo según tamaño de burbuja y largo del título
+  const baseSize = size * 0.12;
+  const lengthFactor = Math.max(0.5, 1 - (task.title.length - 5) * 0.025);
+  const dynamicFontSize = Math.round(Math.max(8, Math.min(baseSize * lengthFactor, 16)));
+  const maxLines = size < 80 ? 1 : 2;
 
   const scaleAnim = useSharedValue(0);
   const opacityAnim = useSharedValue(0);
   const floatAnim = useSharedValue(0);
   const pressAnim = useSharedValue(1);
+  const positionX = useSharedValue(offsetX);
+  const positionY = useSharedValue(offsetY);
 
   useEffect(() => {
     const delay = index * 50;
     const floatDuration = 2000 + index * 200;
 
+    // Set initial position
+    positionX.value = offsetX;
+    positionY.value = offsetY;
+
+    // Entry animations
     scaleAnim.value = withDelay(
       delay,
       withSpring(1, { damping: 12, stiffness: 100 }),
     );
     opacityAnim.value = withDelay(delay, withTiming(1, { duration: 300 }));
 
+    // Floating animation
     floatAnim.value = withDelay(
       delay,
       withRepeat(
@@ -80,6 +89,51 @@ export function BubbleItem({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
 
+  //Shake animation
+  useEffect(() => {
+    if (colliding) {
+      const shake = () => {
+        positionX.value = withSequence(
+          withTiming(offsetX + 5, { duration: 50 }),
+          withTiming(offsetX - 5, { duration: 50 }),
+          withTiming(offsetX + 3, { duration: 50 }),
+          withTiming(offsetX - 3, { duration: 50 }),
+          withTiming(offsetX, { duration: 50 }),
+        );
+      };
+      shake();
+    }
+  }, [colliding]);
+
+  // Update position when offset changes
+  useEffect(() => {
+    positionX.value = offsetX;
+    positionY.value = offsetY;
+  }, [offsetX, offsetY, positionX, positionY]);
+
+  // Handlers
+  const handleDoubleTap = onDoubleTap ?? (() => {});
+
+  // SINGLE-TAP gesture (reemplaza el onPress del Pressable)
+  const singleTapGesture = Gesture.Tap()
+    .maxDuration(250)
+    .onEnd(() => {
+      "worklet";
+      runOnJS(onPress)();
+    });
+
+  // DOUBLE-TAP gesture
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      "worklet";
+      runOnJS(handleDoubleTap)();
+    });
+
+  // Exclusive: si es doble tap, NO ejecuta el single tap
+  const combinedGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
+
+  // Press feedback animations
   const handlePressIn = () => {
     pressAnim.value = withSpring(0.9, { damping: 15, stiffness: 200 });
   };
@@ -90,58 +144,44 @@ export function BubbleItem({
 
   const animatedStyle = useAnimatedStyle(() => {
     const floatOffset = Math.sin(floatAnim.value * Math.PI) * 5;
-    const radius = size / 2;
 
     return {
-      transform: [
-        // 1. Mover centro al origen (0,0)
-        { translateX: offsetX - radius },
-        { translateY: offsetY - radius },
-        // 2. Scale desde el centro
-        { scale: scaleAnim.value * pressAnim.value },
-        // 3. Volver a posición + float offset
-        { translateX: radius },
-        { translateY: radius + floatOffset },
-      ],
-      // Sombra estática sutil
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.12,
-      shadowRadius: 6,
-      opacity: opacityAnim.value * (task.completed ? 0.5 : 1),
+      // Use actual position for touch area
+      left: positionX.value,
+      top: positionY.value + floatOffset,
+      transform: [{ scale: scaleAnim.value * pressAnim.value }],
+      opacity: opacityAnim.value,
     };
   });
 
   return (
     <Animated.View
       key={bubbleId}
-      style={[
-        styles.container,
-        { width: size, height: size },
-        animatedStyle,
-      ]}
+      style={[styles.container, animatedStyle, { zIndex }]}
     >
-      <Pressable
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        hitSlop={8}
-        style={[
-          styles.bubble,
-          {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            backgroundColor,
-            opacity: 1,
-            borderColor,
-            borderWidth: 0.5,
-          },
-        ]}
-      >
-        <Text style={[styles.text, { fontSize }]} numberOfLines={2}>
-          {task.title}
-        </Text>
-      </Pressable>
+      <GestureDetector gesture={combinedGesture}>
+        <Pressable
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          style={[
+            styles.bubble,
+            {
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              backgroundColor,
+            },
+          ]}
+        >
+          {task.completed ? (
+            <Check size={dynamicFontSize + 10} color="#333" />
+          ) : (
+            <Text style={[styles.text, { fontSize: dynamicFontSize }]} numberOfLines={maxLines}>
+              {task.title}
+            </Text>
+          )}
+        </Pressable>
+      </GestureDetector>
     </Animated.View>
   );
 }
@@ -149,23 +189,20 @@ export function BubbleItem({
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    left: 0,
-    top: 0,
   },
   bubble: {
-    position: "absolute",
     justifyContent: "center",
     alignItems: "center",
     padding: 8,
-    shadowColor: "#666",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 5,
+    shadowColor: "#888",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
     elevation: 2,
   },
   text: {
     fontWeight: "600",
     textAlign: "center",
-    color: "#333",
+    color: "#141414",
   },
 });

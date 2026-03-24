@@ -1,14 +1,18 @@
 import { BubbleCanvas } from "@/features/tasks/components/BubbleCanvas";
+import { StatusTabs } from "@/features/tasks/components/StatusTabs";
 import { TaskDetailCard } from "@/features/tasks/components/TaskDetailCard";
 import { TaskForm } from "@/features/tasks/components/TaskForm";
 import { useTasks } from "@/features/tasks/hooks/useTasks";
 import type { Task, TaskInput } from "@/features/tasks/types/task";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+type StatusFilter = "all" | "completed" | "active";
+
 export default function HomeScreen() {
   const {
+    tasks,
     activeTasks,
     completedTasks,
     isLoading,
@@ -23,6 +27,29 @@ export default function HomeScreen() {
   const [isDetailVisible, setIsDetailVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
+
+  // Filtros
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  // Tareas filtradas
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      if (statusFilter === "all") return true;
+      if (statusFilter === "completed") return task.completed;
+      if (statusFilter === "active") return !task.completed;
+      return true;
+    });
+  }, [tasks, statusFilter]);
+
+  // Counts para los tabs
+  const counts = useMemo(
+    () => ({
+      all: tasks.length,
+      completed: completedTasks.length,
+      active: activeTasks.length,
+    }),
+    [tasks.length, completedTasks.length, activeTasks.length],
+  );
 
   const handleBubblePress = (task: Task) => {
     setSelectedTask(task);
@@ -63,7 +90,7 @@ export default function HomeScreen() {
     } else {
       const newTask: Task = {
         ...input,
-        id: Date.now().toString(),
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         createdAt: new Date().toISOString(),
       };
       addTask(newTask);
@@ -86,12 +113,21 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Priorify</Text>
-        <Text style={styles.counterText}>
-          {activeTasks.length} active / {completedTasks.length} done
-        </Text>
       </View>
 
-      <BubbleCanvas tasks={activeTasks} onBubblePress={handleBubblePress} />
+      <StatusTabs
+        value={statusFilter}
+        onChange={setStatusFilter}
+        counts={counts}
+      />
+
+      <View style={styles.canvasContainer}>
+        <BubbleCanvas
+          tasks={filteredTasks}
+          onBubblePress={handleBubblePress}
+          onToggleComplete={toggleComplete}
+        />
+      </View>
 
       <Pressable style={styles.fab} onPress={handleAddTask}>
         <Text style={styles.fabText}>+</Text>
@@ -120,6 +156,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
+  },
+  canvasContainer: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -161,6 +200,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 8,
+    zIndex: 10,
   },
   fabText: {
     fontSize: 32,

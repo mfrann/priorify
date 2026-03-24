@@ -3,7 +3,6 @@ import { BottomSheet } from "@/shared/components/BottomSheet";
 import {
   CATEGORY_COLORS,
   CATEGORY_LABELS,
-  PRIORITY_COLORS,
   PRIORITY_LABELS,
 } from "@/shared/constants/theme";
 import {
@@ -44,8 +43,6 @@ export function TaskDetailCard({
   onDelete,
   onToggleComplete,
 }: TaskDetailCardProps) {
-  // El BottomSheet ya maneja visible={false}, pero mantenemos el return
-  // para el caso donde se llama sin task
   if (!task) return null;
 
   const formatDate = (dateString: string) => {
@@ -57,7 +54,11 @@ export function TaskDetailCard({
     });
   };
 
-  const priorityColor = PRIORITY_COLORS[task.priority];
+  const capitalize = (str: string): string => {
+    if (!str) return "";
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  };
+
   const priorityLabel = PRIORITY_LABELS[task.priority];
   const priorityWidth =
     task.priority === 1 ? "33%" : task.priority === 2 ? "66%" : "100%";
@@ -94,12 +95,13 @@ export function TaskDetailCard({
         </View>
 
         <ScrollView
-          style={styles.body}
+          style={[styles.body, { flex: 1 }]}
           showsVerticalScrollIndicator={true}
           indicatorStyle="white"
+          contentContainerStyle={styles.bodyContent}
         >
           <View style={styles.section}>
-            <Text style={styles.title}>{task.title}</Text>
+            <Text style={styles.title}>{capitalize(task.title)}</Text>
           </View>
 
           <View style={styles.divider} />
@@ -111,11 +113,11 @@ export function TaskDetailCard({
                 <View
                   style={[
                     styles.priorityBarFill,
-                    { width: priorityWidth, backgroundColor: priorityColor },
+                    { width: priorityWidth, backgroundColor: categoryColor },
                   ]}
                 />
               </View>
-              <Text style={[styles.priorityLabel, { color: priorityColor }]}>
+              <Text style={[styles.priorityLabel, { color: categoryColor }]}>
                 {priorityLabel}
               </Text>
             </View>
@@ -126,7 +128,7 @@ export function TaskDetailCard({
           <View style={styles.section}>
             <Text style={styles.label}>DESCRIPTION</Text>
             {task.description ? (
-              <Text style={styles.value}>{task.description}</Text>
+              <Text style={styles.value}>{capitalize(task.description)}</Text>
             ) : (
               <Text style={styles.noValue}>No description</Text>
             )}
@@ -138,10 +140,16 @@ export function TaskDetailCard({
             <Text style={styles.label}>CATEGORY</Text>
             {task.category ? (
               <View
-                style={[styles.categoryBadge, { borderColor: categoryColor }]}
+                style={[
+                  styles.categoryBadge,
+                  {
+                    borderColor: categoryColor,
+                    backgroundColor: `${categoryColor}1A`,
+                  },
+                ]}
               >
                 {CategoryIcon && (
-                  <CategoryIcon size={22} color={categoryColor} />
+                  <CategoryIcon size={18} color={categoryColor} />
                 )}
                 <Text style={[styles.categoryText, { color: categoryColor }]}>
                   {categoryLabel}
@@ -249,6 +257,8 @@ const styles = StyleSheet.create({
   body: {
     paddingHorizontal: 20,
     paddingTop: 20,
+  },
+  bodyContent: {
     paddingBottom: 20,
   },
   section: {
@@ -309,15 +319,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
     borderWidth: 2,
     gap: 6,
   },
   categoryText: {
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "500",
   },
   dateRow: {
     flexDirection: "row",
@@ -346,6 +356,8 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     borderWidth: 1.5,
     borderColor: "rgba(231, 76, 60, 0.6)",
+    backgroundColor: "#ffbaba",
+    elevation: 2,
   },
   deleteText: {
     fontSize: 16,

@@ -1,30 +1,36 @@
 import type { Task } from "@/features/tasks/types/task";
-import { BUBBLE_SIZE } from "@/shared/constants/theme";
-import { Dimensions, StyleSheet, View } from "react-native";
+import {
+  BUBBLE_SIZE,
+  CATEGORY_COLORS,
+  NO_CATEGORY_COLOR,
+} from "@/shared/constants/theme";
+import { useMemo } from "react";
+import { Dimensions, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BubbleItem } from "./BubbleItem";
-
 interface BubbleCanvasProps {
   tasks: Task[];
   onBubblePress: (task: Task) => void;
+  onToggleComplete: (taskId: string) => void;
 }
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const CANVAS_PADDING = 20;
-const CANVAS_WIDTH = SCREEN_WIDTH - CANVAS_PADDING * 2;
-const CANVAS_HEIGHT = SCREEN_HEIGHT - 280;
-const CENTER_X = CANVAS_WIDTH / 2;
-const CENTER_Y = CANVAS_HEIGHT / 2;
-const MAX_RADIUS = Math.min(CANVAS_WIDTH, CANVAS_HEIGHT) / 2 - 50;
-
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const CANVAS_PADDING = 50;
+const BASE_CANVAS_WIDTH = SCREEN_WIDTH;
+const BASE_CANVAS_HEIGHT = 450;
+const GAP = 12;
 interface PositionedTask {
   task: Task;
   x: number;
   y: number;
   scale: number;
+  colliding?: boolean;
 }
-
-const GAP = 15;
-
+interface LayoutParams {
+  canvasWidth: number;
+  canvasHeight: number;
+  centerX: number;
+  centerY: number;
+}
 const checkCollision = (
   x: number,
   y: number,
@@ -37,143 +43,142 @@ const checkCollision = (
     const dy = y - pos.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
     const minDistance = radius + otherRadius + GAP;
-
     if (distance < minDistance) {
       return true;
     }
   }
   return false;
 };
-
-const generateRandomPosition = (
-  minRadius: number,
-  maxRadius: number,
-): { x: number; y: number } => {
-  const angle = Math.random() * 2 * Math.PI;
-  const radius = minRadius + Math.random() * (maxRadius - minRadius);
-  return {
-    x: CENTER_X + Math.cos(angle) * radius,
-    y: CENTER_Y + Math.sin(angle) * radius,
-  };
-};
-
-const calculateLayout = (tasks: Task[]): PositionedTask[] => {
-  if (tasks.length === 0) return [];
-
-  const sortedByPriority = [...tasks].sort((a, b) => a.priority - b.priority);
-
+const calculateLayout = (
+  tasks: Task[],
+  params: LayoutParams,
+): { positions: PositionedTask[]; maxY: number } => {
+  if (tasks.length === 0) return { positions: [], maxY: 0 };
+  const { canvasWidth, canvasHeight, centerX, centerY } = params;
+  const sortedByPriority = [...tasks].sort((a, b) => b.priority - a.priority);
   const positions: PositionedTask[] = [];
-
-  for (const task of sortedByPriority) {
-    const baseSize = BUBBLE_SIZE[task.priority];
+  // Calcular escala basada en cantidad de tareas
+  const totalTasks = sortedByPriority.length;
+  const baseScale = Math.max(0.6, 1 - (totalTasks - 1) * 0.04);
+  for (let i = 0; i < sortedByPriority.length; i++) {
+    const task = sortedByPriority[i];
+    const baseSize = BUBBLE_SIZE[task.priority] * baseScale;
     const radius = baseSize / 2;
-    let x = CENTER_X;
-    let y = CENTER_Y;
-    let attempts = 0;
-    const maxAttempts = 50;
-
-    if (positions.length > 0) {
-      let found = false;
-
-      for (let r = 0; r <= MAX_RADIUS && !found; r += 20) {
-        for (let i = 0; i < 20 && !found; i++) {
-          const pos = generateRandomPosition(r, r + 20);
-          x = pos.x;
-          y = pos.y;
-
-          if (!checkCollision(x, y, radius, positions)) {
-            found = true;
-          }
-          attempts++;
-
-          if (attempts >= maxAttempts) break;
-        }
-      }
-
-      if (!found) {
-        for (let attempt = 0; attempt < 100; attempt++) {
-          const pos = generateRandomPosition(0, MAX_RADIUS);
-          if (!checkCollision(pos.x, pos.y, radius, positions)) {
-            x = pos.x;
-            y = pos.y;
-            found = true;
-            break;
-          }
+    let x = centerX;
+    let y = centerY;
+    let colliding = false;
+    // Primera burbuja: va al centro
+    if (i === 0) {
+      positions.push({ task, x, y, scale: baseScale, colliding: false });
+      continue;
+    }
+    // Buscar posición en espiral desde el borde de la primera burbuja
+    let found = false;
+    const startRadius = radius + GAP / 2;
+    // Escala del radio basado en cantidad de tareas
+    const radiusMultiplier = 1 + (totalTasks - 1) * 0.15;
+    const maxSearchRadius = 300 * radiusMultiplier;
+    for (let r = startRadius; r <= maxSearchRadius && !found; r += 8) {
+      for (let angle = 0; angle < 360 && !found; angle += 12) {
+        const radians = (angle * Math.PI) / 180;
+        const px = centerX + Math.cos(radians) * r;
+        const py = centerY + Math.sin(radians) * r;
+        if (!checkCollision(px, py, radius, positions)) {
+          x = px;
+          y = py;
+          found = true;
         }
       }
     }
-
-    positions.push({ task, x, y, scale: 1 });
+    // Si no encontró lugar
+    if (!found) {
+      colliding = true;
+      // Buscar en cualquier lugar
+      for (let attempt = 0; attempt < 200 && !found; attempt++) {
+        const px = Math.random() * (canvasWidth - baseSize) + baseSize / 2;
+        const py = Math.random() * (canvasHeight - baseSize) + baseSize / 2;
+        if (!checkCollision(px, py, radius, positions)) {
+          x = px;
+          y = py;
+          found = true;
+        }
+      }
+    }
+    positions.push({ task, x, y, scale: baseScale, colliding });
   }
-
-  let maxRadius = 0;
+  // Calcular el maxY para determinar la altura necesaria
+  let maxY = 0;
   for (const pos of positions) {
     const bubbleRadius = (BUBBLE_SIZE[pos.task.priority] * pos.scale) / 2;
-    const distFromCenter = Math.sqrt(
-      Math.pow(pos.x - CENTER_X, 2) + Math.pow(pos.y - CENTER_Y, 2),
-    );
-    maxRadius = Math.max(maxRadius, distFromCenter + bubbleRadius);
+    maxY = Math.max(maxY, pos.y + bubbleRadius);
   }
-
-  if (maxRadius > MAX_RADIUS) {
-    const scale = MAX_RADIUS / maxRadius;
-    return positions.map((p) => ({
-      ...p,
-      scale: p.scale * scale,
-    }));
-  }
-
-  return positions;
+  return { positions, maxY };
 };
-
-export function BubbleCanvas({ tasks, onBubblePress }: BubbleCanvasProps) {
-  const positionedTasks = calculateLayout(tasks);
-
+export function BubbleCanvas({
+  tasks,
+  onBubblePress,
+  onToggleComplete,
+}: BubbleCanvasProps) {
+  const insets = useSafeAreaInsets();
+  const canvasDimensions = useMemo(() => {
+    const canvasWidth = BASE_CANVAS_WIDTH;
+    const canvasHeight = BASE_CANVAS_HEIGHT;
+    const centerX = canvasWidth / 2;
+    const centerY = canvasHeight / 2;
+    return { canvasWidth, canvasHeight, centerX, centerY };
+  }, []);
+  const { positions: positionedTasks, maxY } = useMemo(
+    () => calculateLayout(tasks, canvasDimensions),
+    [tasks, canvasDimensions],
+  );
+  // Canvas height suficiente para todas las burbujas + padding
+  const canvasHeight = Math.max(BASE_CANVAS_HEIGHT, maxY + 50);
   return (
-    <View style={styles.container}>
-      <View style={styles.canvas}>
-        {[...positionedTasks].reverse().map(({ task, x, y, scale }, index) => {
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={true}
+    >
+      <View style={[styles.canvas, { height: canvasHeight }]}>
+        {positionedTasks.map(({ task, x, y, scale, colliding }, index) => {
           const bubbleSize = BUBBLE_SIZE[task.priority] * scale;
           const radius = bubbleSize / 2;
-
-          let finalX = x - radius;
-          let finalY = y - radius;
-
-          finalX = Math.max(
-            CANVAS_PADDING,
-            Math.min(CANVAS_WIDTH - bubbleSize - CANVAS_PADDING, finalX),
-          );
-          finalY = Math.max(
-            CANVAS_PADDING,
-            Math.min(CANVAS_HEIGHT - bubbleSize - CANVAS_PADDING, finalY),
-          );
-
+          const finalX = x - radius;
+          const finalY = y - radius;
+          const zIndex = index + 1;
+          const bubbleColor = task.category
+            ? CATEGORY_COLORS[task.category]
+            : NO_CATEGORY_COLOR;
           return (
             <BubbleItem
               key={task.id}
               bubbleId={task.id}
               task={task}
               onPress={() => onBubblePress(task)}
+              onDoubleTap={() => onToggleComplete(task.id)}
+              color={bubbleColor}
               scale={scale}
               index={index}
               offsetX={finalX}
               offsetY={finalY}
+              zIndex={zIndex}
+              colliding={colliding}
             />
           );
         })}
       </View>
-    </View>
+    </ScrollView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
   canvas: {
-    flex: 1,
-    width: CANVAS_WIDTH,
-    height: CANVAS_HEIGHT,
+    width: BASE_CANVAS_WIDTH,
     alignSelf: "center",
   },
 });

@@ -1,5 +1,5 @@
 import type { Priority } from "@/features/tasks/types/task";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -28,6 +28,7 @@ export function PrioritySlider({ value, onChange }: PrioritySliderProps) {
   const effectiveValue = value ?? DEFAULT_PRIORITY;
   const translateX = useSharedValue((effectiveValue - 1) * POINT_WIDTH);
   const context = useSharedValue({ x: 0 });
+  const [sliderX, setSliderX] = useState(0);
 
   useEffect(() => {
     translateX.value = withTiming((effectiveValue - 1) * POINT_WIDTH, {
@@ -60,7 +61,8 @@ export function PrioritySlider({ value, onChange }: PrioritySliderProps) {
     });
 
   const tapGesture = Gesture.Tap().onEnd((event) => {
-    const index = Math.round(event.x / POINT_WIDTH);
+    const relativeX = event.x - sliderX;
+    const index = Math.round(relativeX / POINT_WIDTH);
     const clampedIndex = Math.max(0, Math.min(2, index));
     translateX.value = withTiming(clampedIndex * POINT_WIDTH, {
       duration: 150,
@@ -77,7 +79,10 @@ export function PrioritySlider({ value, onChange }: PrioritySliderProps) {
   return (
     <View style={styles.container}>
       <GestureDetector gesture={composedGesture}>
-        <View style={styles.sliderContainer}>
+        <View 
+          style={styles.sliderContainer}
+          onLayout={(event) => setSliderX(event.nativeEvent.layout.x)}
+        >
           <View style={styles.track} />
           <Animated.View style={[styles.thumb, thumbStyle]} />
           {[0, 1, 2].map((index) => (

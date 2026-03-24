@@ -36,7 +36,7 @@ export function CategorySelector({ value, onChange }: CategorySelectorProps) {
             ]}
             onPress={() => onChange(cat)}
           >
-            <Icon size={25} color={isSelected ? borderColor : "#999"} />
+            <Icon size={20} color={isSelected ? borderColor : "#999"} />
           </Pressable>
         );
       })}
@@ -54,10 +54,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 15,
-    paddingVertical: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     borderRadius: 100,
     borderWidth: 2,
     backgroundColor: "#fff",
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: "500",
   },
 });

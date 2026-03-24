@@ -1,27 +1,29 @@
-export const PRIORITY_COLORS: Record<number, string> = {
+import type { Priority } from "@/features/tasks/types/task";
+
+export const PRIORITY_COLORS: Record<Priority, string> = {
   1: "#B5D8EB",
   2: "#D4C4E8",
   3: "#F0C4B8",
 };
 
-export const BUBBLE_SIZE: Record<number, number> = {
-  1: 110,
-  2: 155,
-  3: 225,
+export const BUBBLE_SIZE: Record<Priority, number> = {
+  1: 50,
+  2: 90,
+  3: 150,
 };
 
-export const PRIORITY_LABELS: Record<number, string> = {
-  1: "Bajo",
-  2: "Medio",
-  3: "Alto",
+export const PRIORITY_LABELS: Record<Priority, string> = {
+  1: "Low",
+  2: "Medium",
+  3: "High",
 };
 
 export const CATEGORY_COLORS = {
-  WORK: "#7fb3d3",
-  PERSONAL: "#c39bd3",
-  STUDY: "#82e0aa",
-  HEALTH: "#f1948a",
-  FUN: "#f7dc6f",
+  WORK: "#9dc0fb",
+  PERSONAL: "#e4a4fd",
+  STUDY: "#99fc8c",
+  HEALTH: "#fe9393",
+  FUN: "#fee176",
 };
 
 export const CATEGORY_LABELS = {
@@ -32,4 +34,4 @@ export const CATEGORY_LABELS = {
   FUN: "Fun",
 };
 
-export const NO_CATEGORY_COLOR = "#CCCCCC"; // gris neutral
+export const NO_CATEGORY_COLOR = "#CCCCCC";

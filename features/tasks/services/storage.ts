@@ -46,7 +46,11 @@ export const StorageService = {
       
       for (const [, value] of pairs) {
         if (value != null) {
-          tasks.push(JSON.parse(value));
+          try {
+            tasks.push(JSON.parse(value));
+          } catch (error) {
+            console.error("StorageService.getAllTasks: Failed to parse task:", error);
+          }
         }
       }
       
