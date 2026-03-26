@@ -4,30 +4,30 @@ import type {
   Task,
   TaskInput,
 } from "@/features/tasks/types/task";
-import { X } from "lucide-react-native";
+import { Check } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import {
+  BottomSheetScrollView,
+} from "@gorhom/bottom-sheet";
+import {
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { BottomSheet } from "@/shared/components/BottomSheet";
 import { CategorySelector } from "./CategorySelector";
 import { DatePickerField } from "./DatePickerField";
 import { PrioritySlider } from "./PrioritySlider";
+import { COLORS } from "@/shared/constants/theme";
 
 interface TaskFormProps {
-  visible: boolean;
   onClose: () => void;
   onSave: (task: TaskInput) => void;
   initialTask?: Task;
 }
 
 export function TaskForm({
-  visible,
   onClose,
   onSave,
   initialTask,
@@ -58,7 +58,7 @@ export function TaskForm({
     } else {
       resetForm();
     }
-  }, [initialTask, visible, resetForm]);
+  }, [initialTask]);
 
   const handleSave = () => {
     if (!title.trim()) return;
@@ -76,54 +76,16 @@ export function TaskForm({
     onClose();
   };
 
-  const handleClose = () => {
-    resetForm();
-    onClose();
-  };
-
   return (
-    <BottomSheet visible={visible} onClose={handleClose}>
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Pressable
-              onPress={handleClose}
-              style={styles.closeButton}
-              hitSlop={15}
-            >
-              <X size={24} color="#333" />
-            </Pressable>
-          </View>
-          <Text style={styles.headerTitle}>
-            {initialTask ? "EDIT TASK" : "ADD TASK"}
-          </Text>
-          <View style={styles.headerRight}>
-            <Pressable
-              onPress={handleSave}
-              disabled={!title.trim()}
-              style={[
-                styles.saveButton,
-                !title.trim() && styles.saveButtonDisabled,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.saveText,
-                  !title.trim() && styles.saveTextDisabled,
-                ]}
-              >
-                SAVE
-              </Text>
-            </Pressable>
-          </View>
-        </View>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>
+          {initialTask ? "EDIT TASK" : "ADD TASK"}
+        </Text>
+      </View>
 
-        <ScrollView
-          style={[styles.scrollView, { flex: 1 }]}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={true}
-          indicatorStyle="white"
-        >
+      <BottomSheetScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.body}>
           <View style={styles.form}>
             <Text style={styles.sectionTitle}>TITLE</Text>
             <TextInput
@@ -154,77 +116,56 @@ export function TaskForm({
             <Text style={styles.sectionTitle}>DUE DATE</Text>
             <DatePickerField value={deadline} onChange={setDeadline} />
           </View>
-        </ScrollView>
+        </View>
+      </BottomSheetScrollView>
+
+      <View style={styles.footer}>
+        <Pressable style={styles.cancelButton} onPress={onClose}>
+          <Text style={styles.cancelText}>CANCEL</Text>
+        </Pressable>
+
+        <Pressable
+          style={[
+            styles.actionButton,
+            { backgroundColor: COLORS.tabActive },
+            !title.trim() && styles.actionButtonDisabled,
+          ]}
+          onPress={handleSave}
+          disabled={!title.trim()}
+        >
+          <Text style={styles.actionText}>
+            {initialTask ? "SAVE" : "CREATE"}
+          </Text>
+        </Pressable>
       </View>
-    </BottomSheet>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
+  container: {
     flex: 1,
   },
+  scrollView: {
+    flexShrink: 1,
+  },
+  scrollContent: {
+    paddingBottom: 16,
+  },
+  body: {
+    paddingBottom: 20,
+  },
   header: {
-    flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
-  headerLeft: {
-    width: 50,
-    alignItems: "flex-start",
-  },
-  headerRight: {
-    width: 50,
-    alignItems: "flex-end",
-  },
-  closeButton: {
-    padding: 4,
-  },
   headerTitle: {
-    flex: 1,
-    textAlign: "center",
     fontSize: 16,
     fontWeight: "900",
     color: "#333",
-  },
-  saveButton: {
-    padding: 7,
-    width: 70,
-    borderRadius: 20,
-    backgroundColor: "rgba(50, 50, 50, 0.8)",
-    borderWidth: 1.5,
-    borderColor: "rgba(255, 255, 255, 0.4)",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  saveButtonDisabled: {
-    backgroundColor: "rgba(200, 200, 200, 0.3)",
-    borderWidth: 1,
-    borderColor: "rgba(200, 200, 200, 0.3)",
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  saveText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#fff",
-  },
-  saveTextDisabled: {
-    color: "#999",
-  },
-  scrollView: {
-    maxHeight: "100%",
-  },
-  scrollContent: {
-    paddingBottom: 15,
   },
   form: {
     paddingHorizontal: 20,
@@ -249,5 +190,54 @@ const styles = StyleSheet.create({
     color: "#999",
     letterSpacing: 1,
     marginTop: 8,
+  },
+  footer: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 32,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 30,
+    borderWidth: 1.5,
+    borderColor: "#ddd",
+    backgroundColor: "#fff",
+  },
+  cancelText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#666",
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 30,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  actionButtonDisabled: {
+    backgroundColor: "#ccc",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  actionText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff",
   },
 });

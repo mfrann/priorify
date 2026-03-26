@@ -8,10 +8,14 @@ import { useMemo } from "react";
 import { Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BubbleItem } from "./BubbleItem";
+
+type StatusFilter = "all" | "completed" | "active";
+
 interface BubbleCanvasProps {
   tasks: Task[];
+  statusFilter: StatusFilter;
   onBubblePress: (task: Task) => void;
-  onToggleComplete: (taskId: string) => void;
+  onToggleComplete: (taskId: string, willBeCompleted: boolean) => void;
 }
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CANVAS_PADDING = 50;
@@ -116,6 +120,7 @@ const calculateLayout = (
 };
 export function BubbleCanvas({
   tasks,
+  statusFilter,
   onBubblePress,
   onToggleComplete,
 }: BubbleCanvasProps) {
@@ -157,16 +162,36 @@ export function BubbleCanvas({
           const finalX = x - radius;
           const finalY = y - radius;
           const zIndex = index + 1;
-          const bubbleColor = task.category
-            ? CATEGORY_COLORS[task.category]
-            : NO_CATEGORY_COLOR;
+          
+          // Si está completada Y no estamos en el tab "Done", mostrar color desaturado
+          const isCompleted = task.completed;
+          const showDesaturated = isCompleted && statusFilter !== "completed";
+          
+          const bubbleColor = showDesaturated
+            ? "#B5B5B5" // Color gris para completadas fuera de Done
+            : task.category
+              ? CATEGORY_COLORS[task.category]
+              : NO_CATEGORY_COLOR;
+
+          const handleDoubleTap = () => {
+            // Si NO está completada, marcar
+            if (!task.completed) {
+              onToggleComplete(task.id, true);
+            }
+            // Si está completada Y estamos en tab "Done", desmarcar
+            else if (statusFilter === "completed") {
+              onToggleComplete(task.id, false);
+            }
+            // Si está completada pero NO estamos en Done, no hacer nada
+          };
+
           return (
             <BubbleItem
               key={task.id}
               bubbleId={task.id}
               task={task}
               onPress={() => onBubblePress(task)}
-              onDoubleTap={() => onToggleComplete(task.id)}
+              onDoubleTap={handleDoubleTap}
               color={bubbleColor}
               scale={scale}
               index={index}

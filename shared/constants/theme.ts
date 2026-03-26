@@ -1,6 +1,15 @@
 import type { Priority } from "@/features/tasks/types/task";
 
 // =============================================================================
+// PRIORITY COLORS (for task priority bars)
+// =============================================================================
+export const PRIORITY_COLORS: Record<number, string> = {
+  1: "#B5D8EB",
+  2: "#D4C4E8",
+  3: "#F0C4B8",
+};
+
+// =============================================================================
 // BUBBLE SIZING (based on priority)
 // =============================================================================
 export const BUBBLE_SIZE: Record<Priority, number> = {

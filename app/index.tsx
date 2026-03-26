@@ -5,9 +5,12 @@ import { TaskForm } from "@/features/tasks/components/TaskForm";
 import { useTasks } from "@/features/tasks/hooks/useTasks";
 import type { Task, TaskInput } from "@/features/tasks/types/task";
 import { COLORS } from "@/shared/constants/theme";
-import { useMemo, useState } from "react";
+import { TaskSheet } from "@/shared/components/TaskSheet";
+import { useToast } from "@/shared/hooks/useToast";
+import { useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import type { BottomSheetModal } from "@gorhom/bottom-sheet";
 
 type StatusFilter = "all" | "completed" | "active";
 
@@ -24,8 +27,14 @@ export default function HomeScreen() {
     toggleComplete,
   } = useTasks();
 
-  const [isFormVisible, setIsFormVisible] = useState(false);
-  const [isDetailVisible, setIsDetailVisible] = useState(false);
+  // Toast
+  const { showToast, ToastComponent } = useToast();
+
+  // Refs para los BottomSheet modals
+  const formSheetRef = useRef<BottomSheetModal>(null);
+  const detailSheetRef = useRef<BottomSheetModal>(null);
+
+  // Estado para la tarea seleccionada
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
 
@@ -52,35 +61,38 @@ export default function HomeScreen() {
     [tasks.length, completedTasks.length, activeTasks.length],
   );
 
+  // Handlers
   const handleBubblePress = (task: Task) => {
     setSelectedTask(task);
-    setIsDetailVisible(true);
+    detailSheetRef.current?.present();
   };
 
   const handleAddTask = () => {
     setEditingTask(undefined);
-    setIsFormVisible(true);
+    formSheetRef.current?.present();
   };
 
   const handleToggleComplete = () => {
     if (selectedTask) {
       toggleComplete(selectedTask.id);
-      setIsDetailVisible(false);
+      showToast("Task completed");
+      detailSheetRef.current?.dismiss();
     }
   };
 
   const handleEditTask = () => {
-    setIsDetailVisible(false);
-    setEditingTask(selectedTask || undefined);
+    detailSheetRef.current?.dismiss();
     setTimeout(() => {
-      setIsFormVisible(true);
+      setEditingTask(selectedTask || undefined);
+      formSheetRef.current?.present();
     }, 300);
   };
 
   const handleDeleteTask = () => {
     if (selectedTask) {
       removeTask(selectedTask.id);
-      setIsDetailVisible(false);
+      showToast("Task deleted");
+      detailSheetRef.current?.dismiss();
       setSelectedTask(null);
     }
   };
@@ -88,6 +100,7 @@ export default function HomeScreen() {
   const handleSaveTask = (input: TaskInput) => {
     if (editingTask) {
       updateTask(editingTask.id, input);
+      showToast("Task updated");
     } else {
       const newTask: Task = {
         ...input,
@@ -95,9 +108,19 @@ export default function HomeScreen() {
         createdAt: new Date().toISOString(),
       };
       addTask(newTask);
+      showToast("Task created");
     }
-    setIsFormVisible(false);
+    formSheetRef.current?.dismiss();
     setEditingTask(undefined);
+  };
+
+  const handleFormClose = () => {
+    formSheetRef.current?.dismiss();
+    setEditingTask(undefined);
+  };
+
+  const handleDetailClose = () => {
+    detailSheetRef.current?.dismiss();
   };
 
   if (!isInitialized || isLoading) {
@@ -125,8 +148,14 @@ export default function HomeScreen() {
       <View style={styles.canvasContainer}>
         <BubbleCanvas
           tasks={filteredTasks}
+          statusFilter={statusFilter}
           onBubblePress={handleBubblePress}
-          onToggleComplete={toggleComplete}
+          onToggleComplete={(taskId, willBeCompleted) => {
+            toggleComplete(taskId);
+            if (willBeCompleted) {
+              showToast("Task completed ✓");
+            }
+          }}
         />
       </View>
 
@@ -134,21 +163,30 @@ export default function HomeScreen() {
         <Text style={styles.fabText}>+</Text>
       </Pressable>
 
-      <TaskForm
-        visible={isFormVisible}
-        onClose={() => setIsFormVisible(false)}
-        onSave={handleSaveTask}
-        initialTask={editingTask}
-      />
+      {/* Task Form Sheet */}
+      <TaskSheet ref={formSheetRef} onClose={handleFormClose}>
+        <TaskForm
+          onClose={handleFormClose}
+          onSave={handleSaveTask}
+          initialTask={editingTask}
+        />
+      </TaskSheet>
 
-      <TaskDetailCard
-        task={selectedTask}
-        visible={isDetailVisible}
-        onClose={() => setIsDetailVisible(false)}
-        onToggleComplete={handleToggleComplete}
-        onEdit={handleEditTask}
-        onDelete={handleDeleteTask}
-      />
+      {/* Task Detail Sheet */}
+      <TaskSheet ref={detailSheetRef} onClose={handleDetailClose}>
+        {selectedTask && (
+          <TaskDetailCard
+            task={selectedTask}
+            onClose={handleDetailClose}
+            onToggleComplete={handleToggleComplete}
+            onEdit={handleEditTask}
+            onDelete={handleDeleteTask}
+          />
+        )}
+      </TaskSheet>
+
+      {/* Toast */}
+      <ToastComponent />
     </SafeAreaView>
   );
 }
@@ -201,7 +239,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 8,
-    zIndex: 10,
+    zIndex: 1,
   },
   fabText: {
     fontSize: 32,
