@@ -5,11 +5,12 @@ import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { Home, CalendarDays, Settings } from "lucide-react-native";
 import { useSwipeNavigation } from "@/shared/hooks/useSwipeNavigation";
 
-const TAB_ROUTES = ["/", "/calendar", "/settings"] as const;
+const TAB_ROUTES = ["/home", "/calendar", "/settings"] as const;
 
 function getCurrentIndex(pathname: string): number {
   if (pathname.includes("calendar")) return 1;
   if (pathname.includes("settings")) return 2;
+  if (pathname.includes("home")) return 0;
   return 0;
 }
 
@@ -28,7 +29,7 @@ export default function TabsLayout() {
     },
     onSwipeRight: () => {
       if (currentIndex > 0) {
-        const targetRoute = currentIndex === 2 ? "calendar" : "index";
+        const targetRoute = currentIndex === 2 ? "calendar" : "home";
         // @ts-expect-error - expo-router navigation typing issue
         navigationRef.navigate(targetRoute);
       }
@@ -58,7 +59,7 @@ export default function TabsLayout() {
               }}
             >
               <Tabs.Screen
-                name="index"
+                name="home"
                 options={{
                   title: "Home",
                   tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,

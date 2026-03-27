@@ -64,7 +64,7 @@ export default function OnboardingScreen() {
     } catch (error) {
       console.error("Failed to save onboarding state:", error);
     }
-    router.replace("/");
+    router.replace("/home");
   };
 
   const renderSlide = ({ item, index }: { item: Slide; index: number }) => (
